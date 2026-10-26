@@ -552,7 +552,7 @@ def call_llm_openai(prompt: str, model: Optional[str] = None, temperature: float
     return resp.output_text
 
 
-def call_llm_anthropic(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None) -> str:
+def call_llm_anthropic(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None, system: Optional[str] = None) -> str:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY not set in environment")
@@ -577,17 +577,26 @@ def call_llm_anthropic(prompt: str, model: Optional[str] = None, temperature: fl
     content.append({"type": "text", "text": prompt})
 
     # temperature is accepted for parity with the other providers and never sent: API version 2026-10-21 rejects sampling parameters.
-    resp = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        thinking={"type": "disabled"},
-        output_config={"effort": "low"},
-        messages=[{"role": "user", "content": content}],
-    )
+    request: Dict[str, Any] = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "thinking": {"type": "disabled"},
+        "output_config": {"effort": "low"},
+        "messages": [{"role": "user", "content": content}],
+    }
+    # The system block is the only cache breakpoint, so its text must be identical on every call.
+    if system:
+        request["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+    resp = client.messages.create(**request)
 
     if resp.stop_reason == "refusal":
         category = getattr(resp.stop_details, "category", None)
         raise RuntimeError(f"Claude declined the request (category: {category})")
+
+    if os.environ.get("LLM_LOG_USAGE") == "1":
+        usage = getattr(resp, "usage", None)
+        if usage is not None:
+            print(f"[claude usage] model={model} in={usage.input_tokens} cache_write={usage.cache_creation_input_tokens or 0} cache_read={usage.cache_read_input_tokens or 0} out={usage.output_tokens}")
 
     return "".join(block.text for block in resp.content if block.type == "text")
 

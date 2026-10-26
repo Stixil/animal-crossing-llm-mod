@@ -92,6 +92,33 @@ class CallLlmAnthropicTests(unittest.TestCase):
             client_cls.assert_not_called()
         self.assertIn("ANTHROPIC_API_KEY", str(ctx.exception))
 
+    def test_system_is_sent_as_one_cached_block(self):
+        _, sent = self._call(system="Static rules")
+        self.assertEqual(sent["system"], [{"type": "text", "text": "Static rules", "cache_control": {"type": "ephemeral"}}])
+        self.assertEqual(sent["messages"], [{"role": "user", "content": [{"type": "text", "text": "Say hi"}]}])
+        self.assertNotIn("cache_control", sent)
+
+    def test_no_system_key_without_system(self):
+        _, sent = self._call()
+        self.assertNotIn("system", sent)
+        self.assertNotIn("cache_control", sent)
+
+    def test_usage_line_printed_only_when_enabled(self):
+        usage = SimpleNamespace(input_tokens=40, output_tokens=60, cache_creation_input_tokens=0, cache_read_input_tokens=610)
+        reply = SimpleNamespace(content=[_text("ok")], stop_reason="end_turn", stop_details=None, usage=usage)
+        with mock.patch("builtins.print") as p:
+            self._call(reply=reply)
+        p.assert_not_called()
+        with mock.patch("builtins.print") as p:
+            self._call(reply=reply, env={"LLM_LOG_USAGE": "1"})
+        line = p.call_args.args[0]
+        for part in ("claude-haiku-5-5", "in=40", "cache_write=0", "cache_read=610", "out=60"):
+            self.assertIn(part, line)
+
+    def test_usage_logging_tolerates_missing_usage(self):
+        result, _ = self._call(env={"LLM_LOG_USAGE": "1"})
+        self.assertEqual(result, "Hi there!")
+
 
 class ProviderRoutingTests(unittest.TestCase):
     def test_default_is_google_when_google_key_set(self):
