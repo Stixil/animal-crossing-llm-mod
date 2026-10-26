@@ -93,5 +93,77 @@ class CallLlmAnthropicTests(unittest.TestCase):
         self.assertIn("ANTHROPIC_API_KEY", str(ctx.exception))
 
 
+class ProviderRoutingTests(unittest.TestCase):
+    def test_default_is_google_when_google_key_set(self):
+        with mock.patch.dict(os.environ, {"GOOGLE_API_KEY": "g"}, clear=True):
+            self.assertEqual(dialogue_prompt.get_model_provider(), "google")
+
+    def test_model_provider_env_anthropic(self):
+        with mock.patch.dict(os.environ, {"MODEL_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "a"}, clear=True):
+            self.assertEqual(dialogue_prompt.get_model_provider(), "anthropic")
+
+    def test_claude_prefix_beats_google_default(self):
+        env = {"GOOGLE_API_KEY": "g", "ANTHROPIC_API_KEY": "a"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(dialogue_prompt.get_model_provider("claude-haiku-5-5"), "anthropic")
+
+    def test_openai_prefix_beats_google_default(self):
+        env = {"GOOGLE_API_KEY": "g", "OPENAI_API_KEY": "o"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(dialogue_prompt.get_model_provider("openai-gpt-5-nano"), "openai")
+
+    def test_gemini_prefix_beats_anthropic_env(self):
+        env = {"MODEL_PROVIDER": "anthropic", "GOOGLE_API_KEY": "g", "ANTHROPIC_API_KEY": "a"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(dialogue_prompt.get_model_provider("gemini-2.0-flash-lite"), "google")
+
+    def test_anthropic_without_key_names_the_variable(self):
+        with mock.patch.dict(os.environ, {"MODEL_PROVIDER": "anthropic"}, clear=True):
+            with self.assertRaises(RuntimeError) as ctx:
+                dialogue_prompt.get_model_provider()
+        self.assertIn("ANTHROPIC_API_KEY", str(ctx.exception))
+
+    def test_unknown_provider_lists_the_choices(self):
+        with mock.patch.dict(os.environ, {"MODEL_PROVIDER": "mistral", "GOOGLE_API_KEY": "g"}, clear=True):
+            with self.assertRaises(RuntimeError) as ctx:
+                dialogue_prompt.get_model_provider()
+        for name in ("google", "openai", "anthropic"):
+            self.assertIn(name, str(ctx.exception))
+
+    def test_provider_env_is_case_insensitive(self):
+        with mock.patch.dict(os.environ, {"MODEL_PROVIDER": "Anthropic", "ANTHROPIC_API_KEY": "a"}, clear=True):
+            self.assertEqual(dialogue_prompt.get_model_provider(), "anthropic")
+
+
+class CallLlmDispatchTests(unittest.TestCase):
+    def test_call_llm_dispatches_to_anthropic_with_max_tokens(self):
+        with mock.patch.dict(os.environ, {"MODEL_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "a"}, clear=True), \
+                mock.patch.object(dialogue_prompt, "call_llm_anthropic", return_value="ok") as fn:
+            out = dialogue_prompt.call_llm("p", model=None, temperature=0.7, max_tokens=640, image_paths=["x.png"])
+        self.assertEqual(out, "ok")
+        fn.assert_called_once_with(prompt="p", model=None, temperature=0.7, max_tokens=640, image_paths=["x.png"])
+
+    def test_call_llm_still_dispatches_to_gemini(self):
+        with mock.patch.dict(os.environ, {"GOOGLE_API_KEY": "g"}, clear=True), \
+                mock.patch.object(dialogue_prompt, "call_llm_gemini", return_value="ok") as fn:
+            dialogue_prompt.call_llm("p")
+        fn.assert_called_once()
+
+
+class DecoratorModelTests(unittest.TestCase):
+    def test_anthropic_decorator_env_wins(self):
+        env = {"MODEL_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "a",
+               "ANTHROPIC_MODEL": "claude-haiku-5-5", "ANTHROPIC_MODEL_DECORATOR": "claude-sonnet-5-5"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(dialogue_prompt.get_decorator_model(), "claude-sonnet-5-5")
+
+    def test_anthropic_decorator_falls_back_to_model_then_none(self):
+        env = {"MODEL_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "a", "ANTHROPIC_MODEL": "claude-haiku-5-5"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(dialogue_prompt.get_decorator_model(), "claude-haiku-5-5")
+        with mock.patch.dict(os.environ, {"MODEL_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "a"}, clear=True):
+            self.assertIsNone(dialogue_prompt.get_decorator_model())
+
+
 if __name__ == "__main__":
     unittest.main()

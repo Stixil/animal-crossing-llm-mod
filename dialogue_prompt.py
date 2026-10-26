@@ -592,24 +592,28 @@ def call_llm_anthropic(prompt: str, model: Optional[str] = None, temperature: fl
     return "".join(block.text for block in resp.content if block.type == "text")
 
 
-def get_model_provider(model: Optional[str] = None):
-    model_provider = os.environ.get("MODEL_PROVIDER", "google").lower()
+_PROVIDER_KEYS = {"google": "GOOGLE_API_KEY", "openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
 
+
+def get_model_provider(model: Optional[str] = None) -> str:
     def model_starts_with(model: Optional[str], prefix: str) -> bool:
-        return model and model.lower().startswith(prefix.lower())
+        return bool(model) and model.lower().startswith(prefix.lower())
 
-    if (
-        (model_starts_with(model, "gemini") or model_provider == "google")
-        and os.environ.get("GOOGLE_API_KEY") is not None
-    ):
-        return "google"
-    elif (
-        (model_starts_with(model, "openai") or model_provider == "openai")
-        and os.environ.get("OPENAI_API_KEY") is not None
-    ):
-        return "openai"
+    if model_starts_with(model, "gemini"):
+        provider = "google"
+    elif model_starts_with(model, "openai"):
+        provider = "openai"
+    elif model_starts_with(model, "claude"):
+        provider = "anthropic"
     else:
-        raise RuntimeError("Must define either GOOGLE_API_KEY or OPENAI_API_KEY in environment")
+        provider = os.environ.get("MODEL_PROVIDER", "google").lower()
+
+    key_var = _PROVIDER_KEYS.get(provider)
+    if key_var is None:
+        raise RuntimeError(f"Unknown MODEL_PROVIDER '{provider}'; choose google, openai or anthropic")
+    if os.environ.get(key_var) is None:
+        raise RuntimeError(f"{key_var} not set in environment (required for provider '{provider}')")
+    return provider
 
 
 def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None) -> str:
@@ -619,6 +623,8 @@ def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 1.0,
         return call_llm_gemini(prompt=prompt, model=model, temperature=temperature, image_paths=image_paths)
     elif model_provider == "openai":
         return call_llm_openai(prompt=prompt, model=model, temperature=temperature, image_paths=image_paths)
+    elif model_provider == "anthropic":
+        return call_llm_anthropic(prompt=prompt, model=model, temperature=temperature, max_tokens=max_tokens, image_paths=image_paths)
     else:
         raise ValueError("Invalid model provider")
 
@@ -681,6 +687,8 @@ def get_decorator_model() -> Optional[str]:
         return os.environ.get("GOOGLE_MODEL_DECORATOR") or os.environ.get("GOOGLE_MODEL")
     elif model_provider == "openai":
         return os.environ.get("OPENAI_MODEL_DECORATOR") or os.environ.get("OPENAI_MODEL")
+    elif model_provider == "anthropic":
+        return os.environ.get("ANTHROPIC_MODEL_DECORATOR") or os.environ.get("ANTHROPIC_MODEL")
     return None
 
 
