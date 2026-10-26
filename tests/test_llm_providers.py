@@ -165,5 +165,28 @@ class DecoratorModelTests(unittest.TestCase):
             self.assertIsNone(dialogue_prompt.get_decorator_model())
 
 
+class SetupScriptTests(unittest.TestCase):
+    # test_environment() checks os.path.exists('.env') in the cwd, then calls load_dotenv(), which
+    # searches from test_setup.py's own directory (not the cwd). So: an empty .env in a temp cwd
+    # satisfies the existence check, load_dotenv is stubbed out, and the key comes from os.environ.
+    def _run_in_tmp_env(self, env):
+        import test_setup
+        cwd = os.getcwd()
+        with tempfile.TemporaryDirectory() as d:
+            open(os.path.join(d, ".env"), "w").close()
+            os.chdir(d)
+            try:
+                with mock.patch.dict(os.environ, env, clear=True), mock.patch("dotenv.load_dotenv"):
+                    return test_setup.test_environment()
+            finally:
+                os.chdir(cwd)
+
+    def test_anthropic_key_alone_passes_environment_check(self):
+        self.assertTrue(self._run_in_tmp_env({"ANTHROPIC_API_KEY": "sk-ant-test"}))
+
+    def test_anthropic_placeholder_does_not_pass(self):
+        self.assertFalse(self._run_in_tmp_env({"ANTHROPIC_API_KEY": "your_anthropic_api_key_here"}))
+
+
 if __name__ == "__main__":
     unittest.main()

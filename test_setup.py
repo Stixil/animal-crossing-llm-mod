@@ -62,11 +62,14 @@ def test_environment():
         
         google_key = os.getenv('GOOGLE_API_KEY')
         openai_key = os.getenv('OPENAI_API_KEY')
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         
         if google_key and google_key != 'your_gemini_api_key_here':
             print("✅ Google API key configured")
         elif openai_key and openai_key != 'your_openai_api_key_here':
             print("✅ OpenAI API key configured")
+        elif anthropic_key and anthropic_key != 'your_anthropic_api_key_here':
+            print("✅ Anthropic API key configured")
         else:
             print("⚠️  No valid API key found in .env")
             print("   Please add your API key to the .env file")
