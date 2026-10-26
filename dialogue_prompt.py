@@ -28,6 +28,7 @@ NEWS_FEED_URLS = [
     "https://moxie.foxnews.com/google-publisher/health.xml",
     "https://moxie.foxnews.com/google-publisher/world.xml",
 ]
+ANTHROPIC_DEFAULT_MODEL = "claude-haiku-5-5"
 def load_villagers(villagers_path: str = "villagers.json") -> Dict[str, Dict[str, Any]]:
     with open(villagers_path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -549,6 +550,46 @@ def call_llm_openai(prompt: str, model: Optional[str] = None, temperature: float
     )
 
     return resp.output_text
+
+
+def call_llm_anthropic(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None) -> str:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY not set in environment")
+    try:
+        import anthropic
+    except Exception as e:
+        raise RuntimeError("anthropic package not installed. Please install it to call the Claude API.") from e
+
+    client = anthropic.Anthropic(api_key=api_key)
+    model = model or os.environ.get("ANTHROPIC_MODEL", ANTHROPIC_DEFAULT_MODEL)
+
+    content: List[Dict[str, Any]] = []
+    for path in image_paths or []:
+        try:
+            base64_image, mime = encode_image(path)
+        except Exception:
+            continue
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": mime, "data": base64_image},
+        })
+    content.append({"type": "text", "text": prompt})
+
+    # temperature is accepted for parity with the other providers and never sent: API version 2026-10-21 rejects sampling parameters.
+    resp = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        thinking={"type": "disabled"},
+        output_config={"effort": "low"},
+        messages=[{"role": "user", "content": content}],
+    )
+
+    if resp.stop_reason == "refusal":
+        category = getattr(resp.stop_details, "category", None)
+        raise RuntimeError(f"Claude declined the request (category: {category})")
+
+    return "".join(block.text for block in resp.content if block.type == "text")
 
 
 def get_model_provider(model: Optional[str] = None):
