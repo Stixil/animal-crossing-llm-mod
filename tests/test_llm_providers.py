@@ -168,7 +168,7 @@ class CallLlmDispatchTests(unittest.TestCase):
                 mock.patch.object(dialogue_prompt, "call_llm_anthropic", return_value="ok") as fn:
             out = dialogue_prompt.call_llm("p", model=None, temperature=0.7, max_tokens=640, image_paths=["x.png"])
         self.assertEqual(out, "ok")
-        fn.assert_called_once_with(prompt="p", model=None, temperature=0.7, max_tokens=640, image_paths=["x.png"])
+        fn.assert_called_once_with(prompt="p", model=None, temperature=0.7, max_tokens=640, image_paths=["x.png"], system=None)
 
     def test_call_llm_still_dispatches_to_gemini(self):
         with mock.patch.dict(os.environ, {"GOOGLE_API_KEY": "g"}, clear=True), \
@@ -213,6 +213,44 @@ class SetupScriptTests(unittest.TestCase):
 
     def test_anthropic_placeholder_does_not_pass(self):
         self.assertFalse(self._run_in_tmp_env({"ANTHROPIC_API_KEY": "your_anthropic_api_key_here"}))
+
+
+class SystemPassthroughTests(unittest.TestCase):
+    def test_call_llm_forwards_system_to_anthropic(self):
+        with mock.patch.dict(os.environ, {"MODEL_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "a"}, clear=True), \
+                mock.patch.object(dialogue_prompt, "call_llm_anthropic", return_value="ok") as fn:
+            dialogue_prompt.call_llm("p", system="S")
+        self.assertEqual(fn.call_args.kwargs["system"], "S")
+
+    def test_call_llm_forwards_system_to_gemini(self):
+        with mock.patch.dict(os.environ, {"GOOGLE_API_KEY": "g"}, clear=True), \
+                mock.patch.object(dialogue_prompt, "call_llm_gemini", return_value="ok") as fn:
+            dialogue_prompt.call_llm("p", system="S")
+        self.assertEqual(fn.call_args.kwargs["system"], "S")
+
+    def test_gemini_prepends_system_to_prompt(self):
+        with mock.patch.dict(os.environ, {"GOOGLE_API_KEY": "g"}, clear=True), \
+                mock.patch("google.genai.Client") as client_cls:
+            client_cls.return_value.models.generate_content.return_value = SimpleNamespace(text="ok")
+            dialogue_prompt.call_llm_gemini("p", system="S")
+            contents = client_cls.return_value.models.generate_content.call_args.kwargs["contents"]
+        self.assertEqual(contents, ["S\n\np"])
+
+    def test_openai_prepends_system_to_prompt(self):
+        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "o"}, clear=True), \
+                mock.patch("openai.OpenAI") as client_cls:
+            client_cls.return_value.responses.create.return_value = SimpleNamespace(output_text="ok")
+            dialogue_prompt.call_llm_openai("p", system="S")
+            sent = client_cls.return_value.responses.create.call_args.kwargs
+        self.assertEqual(sent["input"][0]["content"][0]["text"], "S\n\np")
+
+    def test_gemini_prompt_unchanged_without_system(self):
+        with mock.patch.dict(os.environ, {"GOOGLE_API_KEY": "g"}, clear=True), \
+                mock.patch("google.genai.Client") as client_cls:
+            client_cls.return_value.models.generate_content.return_value = SimpleNamespace(text="ok")
+            dialogue_prompt.call_llm_gemini("p")
+            contents = client_cls.return_value.models.generate_content.call_args.kwargs["contents"]
+        self.assertEqual(contents, ["p"])
 
 
 if __name__ == "__main__":

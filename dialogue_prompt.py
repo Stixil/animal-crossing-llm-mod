@@ -464,7 +464,9 @@ def encode_image(path: str) -> tuple[str, str]:
     return base64_image, mime
 
 
-def call_llm_gemini(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None) -> str:
+def call_llm_gemini(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None, system: Optional[str] = None) -> str:
+    if system:
+        prompt = f"{system}\n\n{prompt}"
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         raise RuntimeError("GOOGLE_API_KEY not set in environment")
@@ -503,7 +505,9 @@ def call_llm_gemini(prompt: str, model: Optional[str] = None, temperature: float
     return getattr(resp, "text", "") or ""
 
 
-def call_llm_openai(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None) -> str:
+def call_llm_openai(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None, system: Optional[str] = None) -> str:
+    if system:
+        prompt = f"{system}\n\n{prompt}"
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY not set in environment")
@@ -625,15 +629,15 @@ def get_model_provider(model: Optional[str] = None) -> str:
     return provider
 
 
-def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None) -> str:
+def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 1.0, max_tokens: int = 512, image_paths: Optional[List[str]] = None, system: Optional[str] = None) -> str:
     model_provider = get_model_provider(model)
 
     if model_provider == "google":
-        return call_llm_gemini(prompt=prompt, model=model, temperature=temperature, image_paths=image_paths)
+        return call_llm_gemini(prompt=prompt, model=model, temperature=temperature, image_paths=image_paths, system=system)
     elif model_provider == "openai":
-        return call_llm_openai(prompt=prompt, model=model, temperature=temperature, image_paths=image_paths)
+        return call_llm_openai(prompt=prompt, model=model, temperature=temperature, image_paths=image_paths, system=system)
     elif model_provider == "anthropic":
-        return call_llm_anthropic(prompt=prompt, model=model, temperature=temperature, max_tokens=max_tokens, image_paths=image_paths)
+        return call_llm_anthropic(prompt=prompt, model=model, temperature=temperature, max_tokens=max_tokens, image_paths=image_paths, system=system)
     else:
         raise ValueError("Invalid model provider")
 
