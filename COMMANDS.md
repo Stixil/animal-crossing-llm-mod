@@ -195,6 +195,9 @@ echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
 
 # Smoke-test generation without Dolphin
 GENERATION_COOLDOWN_SECONDS=0 python dialogue_prompt.py Ace --no-news --no-decorate
+
+# See prompt caching work: run twice within 5 minutes; the second run's decorator line shows cache_read > 0
+MODEL_PROVIDER=anthropic LLM_LOG_USAGE=1 GENERATION_COOLDOWN_SECONDS=0 python dialogue_prompt.py Ace --no-news
 ```
 
 ## 🎬 YouTube Recording Commands
