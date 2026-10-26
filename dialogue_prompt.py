@@ -642,6 +642,39 @@ def call_llm(prompt: str, model: Optional[str] = None, temperature: float = 1.0,
         raise ValueError("Invalid model provider")
 
 
+DECORATOR_SYSTEM = (
+    "You are a dialogue formatter for Animal Crossing (GameCube).\n"
+    "Decorate each line with in-game control codes to make delivery lively, but keep wording unchanged.\n"
+    "Match input line count exactly. Do not merge or split lines.\n"
+    "Always ensure each line starts with <Press A> exactly once (if it's already there, keep it, don't duplicate).\n"
+    "Use only this safe subset of control codes and syntax (hex uppercase, no spaces inside brackets):\n"
+    "- <Press A>\n"
+    "- <Clear Text>\n"
+    "- <Player Name>\n"
+    "- <Catchphrase>\n"
+    "- <Pause [SS]> (short beats like 05,0A,10,18)\n"
+    "- <Color Line [RRGGBB]> (line tint; prefer dark/muted colors)\n"
+    "- <Color [RRGGBB] for [NN] chars> (brief color accents on a word) (Only use dark colors)\n"
+    "- <Instant Skip> (for quick throwaway asides)\n"
+    "- <Unskippable> (sparingly, for emphasis)\n"
+    "- <Line Type [XX]> (00 normal, 01 excited, etc.)\n"
+    "- <Char Size [XXXX]> (e.g., 0030 small, 0040 normal, 0048 big)\n"
+    "- <Line Size [XXXX]> (wrap width hint, e.g., 001E)\n"
+    "- <Play Sound Effect [NN]> (00 bell, 01 happy, 02 very happy, 05 annoyed, 06 thunder)\n"
+    "- <NPC Expression [CC] [EEEE]> (facial emotion; examples: [00] [000A] happy, [00] [0005] angry, [00] [0002] shocked, [00] [000D] sad, [00] [0015] smile)\n"
+    "Keep visible length around 25 characters per line. THIS IS EXTREMELY IMPORTANT; use <Pause> instead of extra words.\n"
+    "Include either an <NPC Expression> and a <Play Sound Effect> together at least once.\n"
+    "Map moods to sounds: happy→01/02, angry→05, dramatic reveal→06, transactional/chime→00. Vary choices across lines.\n"
+    "Emphasize important words with color when appropriate.\n"
+    "Use <Pause [SS]> throughout the dialogue to make the dialogue more natural and engaging. THIS IS EXTREMELY IMPORTANT.\n"
+    "Use <NPC Expression> and <Play Sound Effect> THROUGHOUT this entire dialogue. THIS IS EXTREMELY IMPORTANT.\n"
+    "Prefer one or two effects per line. Avoid stacking too many on the same span.\n"
+    "If you add <NPC Expression>, place it early (right after <Press A>) and use at most one per line.\n"
+    "Never emit closing tags like </Color>; only use the self-contained forms above.\n"
+    "Output only the decorated lines, nothing else."
+)
+
+
 def _format_control_code_decorator_prompt(raw_lines: str) -> str:
     """Builds a prompt for a second LLM to add safe control codes to the lines.
 
@@ -659,38 +692,7 @@ def _format_control_code_decorator_prompt(raw_lines: str) -> str:
 
     IMPORTANT: Maintain original wording; only insert control codes. One line in, one line out.
     """
-    guidelines = (
-        "You are a dialogue formatter for Animal Crossing (GameCube).\n"
-        "Decorate each line with in-game control codes to make delivery lively, but keep wording unchanged.\n"
-        "Match input line count exactly. Do not merge or split lines.\n"
-        "Always ensure each line starts with <Press A> exactly once (if it's already there, keep it, don't duplicate).\n"
-        "Use only this safe subset of control codes and syntax (hex uppercase, no spaces inside brackets):\n"
-        "- <Press A>\n"
-        "- <Clear Text>\n"
-        "- <Player Name>\n"
-        "- <Catchphrase>\n"
-        "- <Pause [SS]> (short beats like 05,0A,10,18)\n"
-        "- <Color Line [RRGGBB]> (line tint; prefer dark/muted colors)\n"
-        "- <Color [RRGGBB] for [NN] chars> (brief color accents on a word) (Only use dark colors)\n"
-        "- <Instant Skip> (for quick throwaway asides)\n"
-        "- <Unskippable> (sparingly, for emphasis)\n"
-        "- <Line Type [XX]> (00 normal, 01 excited, etc.)\n"
-        "- <Char Size [XXXX]> (e.g., 0030 small, 0040 normal, 0048 big)\n"
-        "- <Line Size [XXXX]> (wrap width hint, e.g., 001E)\n"
-        "- <Play Sound Effect [NN]> (00 bell, 01 happy, 02 very happy, 05 annoyed, 06 thunder)\n"
-        "- <NPC Expression [CC] [EEEE]> (facial emotion; examples: [00] [000A] happy, [00] [0005] angry, [00] [0002] shocked, [00] [000D] sad, [00] [0015] smile)\n"
-        "Keep visible length around 25 characters per line. THIS IS EXTREMELY IMPORTANT; use <Pause> instead of extra words.\n"
-        "Include either an <NPC Expression> and a <Play Sound Effect> together at least once.\n"
-        "Map moods to sounds: happy→01/02, angry→05, dramatic reveal→06, transactional/chime→00. Vary choices across lines.\n"
-        "Emphasize important words with color when appropriate.\n"
-        "Use <Pause [SS]> throughout the dialogue to make the dialogue more natural and engaging. THIS IS EXTREMELY IMPORTANT.\n"
-        "Use <NPC Expression> and <Play Sound Effect> THROUGHOUT this entire dialogue. THIS IS EXTREMELY IMPORTANT.\n"
-        "Prefer one or two effects per line. Avoid stacking too many on the same span.\n"
-        "If you add <NPC Expression>, place it early (right after <Press A>) and use at most one per line.\n"
-        "Never emit closing tags like </Color>; only use the self-contained forms above.\n"
-        "Output only the decorated lines, nothing else."
-    )
-    return f"Input lines (verbatim):\n{raw_lines}\n\nInstructions:\n{guidelines}\n\nNow return the decorated lines in order:"
+    return f"Input lines (verbatim):\n{raw_lines}\n\nNow return the decorated lines in order:"
 
 
 def get_decorator_model() -> Optional[str]:
@@ -722,7 +724,7 @@ def decorate_dialogue_with_control_codes(
 
     prompt = _format_control_code_decorator_prompt(raw_lines)
     decorator_model = model or get_decorator_model()
-    result = call_llm(prompt=prompt, model=decorator_model, temperature=temperature)
+    result = call_llm(prompt=prompt, model=decorator_model, temperature=temperature, system=DECORATOR_SYSTEM)
     return result
 
 

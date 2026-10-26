@@ -253,5 +253,34 @@ class SystemPassthroughTests(unittest.TestCase):
         self.assertEqual(contents, ["p"])
 
 
+class DecoratorCachingTests(unittest.TestCase):
+    def test_two_decorator_calls_send_identical_system_text(self):
+        with mock.patch.dict(os.environ, {"MODEL_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "a"}, clear=True), \
+                mock.patch.object(dialogue_prompt, "call_llm", return_value="x") as fn:
+            dialogue_prompt.decorate_dialogue_with_control_codes("Line A")
+            dialogue_prompt.decorate_dialogue_with_control_codes("Line B")
+        first, second = fn.call_args_list
+        self.assertEqual(first.kwargs["system"], dialogue_prompt.DECORATOR_SYSTEM)
+        self.assertEqual(second.kwargs["system"], dialogue_prompt.DECORATOR_SYSTEM)
+        self.assertIn("Line A", first.kwargs["prompt"])
+        self.assertIn("Line B", second.kwargs["prompt"])
+
+    def test_decorator_user_prompt_shape(self):
+        self.assertEqual(
+            dialogue_prompt._format_control_code_decorator_prompt("L1\nL2"),
+            "Input lines (verbatim):\nL1\nL2\n\nNow return the decorated lines in order:",
+        )
+
+    def test_decorator_system_keeps_every_guideline_and_nothing_variable(self):
+        for marker in ("You are a dialogue formatter", "<NPC Expression [CC] [EEEE]>",
+                       "Output only the decorated lines, nothing else."):
+            self.assertIn(marker, dialogue_prompt.DECORATOR_SYSTEM)
+        self.assertNotIn("Input lines", dialogue_prompt.DECORATOR_SYSTEM)
+
+    def test_decorator_system_stays_long_enough_to_cache(self):
+        # Haiku 5.5 caches prefixes of 512+ tokens; the Task 1 gate cached this text (2,073 chars) as 912 tokens.
+        self.assertGreaterEqual(len(dialogue_prompt.DECORATOR_SYSTEM), 2000)
+
+
 if __name__ == "__main__":
     unittest.main()
