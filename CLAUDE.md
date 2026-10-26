@@ -17,9 +17,3 @@ and writes them back. Entry point `ac_parser_encoder.py`; prompts and provider c
 - Never send `temperature` / `top_p` / `top_k` to the Claude API (version 2026-10-21 rejects them).
 - Subagents never commit, push, stash or run wrap-up; the controlling session commits per task.
 - Feature work goes on a branch and is pushed as that branch; `main` is merged by the owner.
-
-## Active handoff
-
-Execute `docs/superpowers/plans/2026-10-25-claude-provider.md` end to end (spec:
-`docs/superpowers/specs/2026-10-25-claude-provider-design.md`). Use the plan's *Subagent protocol* section if the
-superpowers skills are not installed. Task 5 removes this section.

@@ -43,6 +43,9 @@ python demo.py
 
 # Test if everything is working
 python test_setup.py
+
+# Run the unit tests (no Dolphin, network or API key needed)
+python -m unittest discover -s tests -t . -v
 ```
 
 ## 📊 Advanced Watch Mode Options
@@ -182,6 +185,16 @@ python test_setup.py
 
 # Check .env file
 cat .env
+```
+
+### **Use Claude Instead of Gemini**
+```bash
+# Use Claude instead of Gemini
+echo "MODEL_PROVIDER=anthropic" >> .env
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
+
+# Smoke-test generation without Dolphin
+GENERATION_COOLDOWN_SECONDS=0 python dialogue_prompt.py Ace --no-news --no-decorate
 ```
 
 ## 🎬 YouTube Recording Commands

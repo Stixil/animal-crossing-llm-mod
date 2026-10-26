@@ -7,7 +7,7 @@ echo ""
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
     echo "❌ Python 3 is not installed!"
-    echo "Please install Python 3.8+ from https://python.org"
+    echo "Please install Python 3.10+ from https://python.org"
     exit 1
 fi
 

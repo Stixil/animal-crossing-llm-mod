@@ -8,7 +8,7 @@
 
 Ever wanted to have meaningful conversations with your Animal Crossing villagers? This mod:
 - **Reads dialogue memory** from Animal Crossing running in Dolphin emulator
-- **Generates AI responses** using Google Gemini or OpenAI models
+- **Generates AI responses** using Google Gemini, OpenAI or Anthropic Claude models
 - **Writes new dialogue** back to the game in real-time
 - **Creates dynamic conversations** that feel natural and contextual
 
@@ -16,7 +16,7 @@ Ever wanted to have meaningful conversations with your Animal Crossing villagers
 
 ### 1. Install Python & Dependencies
 ```bash
-# Install Python 3.8+ from python.org
+# Install Python 3.10+ from python.org
 # Then install dependencies
 pip install -r requirements.txt
 ```
@@ -29,6 +29,10 @@ GOOGLE_API_KEY=your_api_key_here
 
 # For OpenAI (Paid)
 OPENAI_API_KEY=your_api_key_here
+
+# For Anthropic Claude (Paid, fastest)
+ANTHROPIC_API_KEY=your_api_key_here
+MODEL_PROVIDER=anthropic
 
 # Optional: Enable features
 ENABLE_SCREENSHOT=1
@@ -85,7 +89,7 @@ python ac_parser_encoder.py --dump
 - **Real-time Updates**: Continuous monitoring and generation
 - **Screenshot Integration**: Visual context for better AI responses
 - **Gossip System**: Villagers remember and reference past conversations
-- **Multi-LLM Support**: Google Gemini and OpenAI compatibility
+- **Multi-LLM Support**: Google Gemini, OpenAI and Anthropic Claude compatibility
 - **Memory Safety**: Prevents overwriting during active conversations
 
 ## 🎯 Perfect for YouTube Content
@@ -101,12 +105,13 @@ python ac_parser_encoder.py --dump
 - **Text Encoding**: Full Animal Crossing character set and control code support
 - **LLM Integration**: Modular design supporting multiple AI providers
 - **Cross-Platform**: Works on Windows, macOS, and Linux
+- **Running the tests**: `python -m unittest discover -s tests -t . -v` (no Dolphin or API key needed)
 
 ## 🚨 Important Notes
 
 - **Emulator Only**: This mod works with Dolphin emulator, not original hardware
 - **Memory Addresses**: May need adjustment for different game versions
-- **API Costs**: OpenAI usage incurs charges, Google Gemini has free tier
+- **API Costs**: OpenAI usage incurs charges, Google Gemini has free tier, Anthropic Claude (claude-haiku-5-5) is paid, priced per token
 - **Game Compatibility**: Tested with Animal Crossing (GAFE01) version
 
 ## ⚠️ Known Issues & Limitations
